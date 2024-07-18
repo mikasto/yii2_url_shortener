@@ -8,7 +8,6 @@
 
 ### Install with Docker
 
-Update your vendor packages
 ```
 docker-compose up -d --build && docker-compose exec php composer install --optimize-autoloader && docker-compose exec php php yii migrate --interactive 0
 ```
