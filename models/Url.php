@@ -2,13 +2,17 @@
 
 namespace app\models;
 
+use yii\base\Exception;
+use yii\base\Security;
+use yii\web\ServerErrorHttpException;
+
 /**
  * This is the model class for table "urls".
  *
  * @property int $id
  * @property string $url
  * @property string $short
- * @property string|null $created
+ * @property int $created
  */
 class Url extends \yii\db\ActiveRecord
 {
@@ -29,8 +33,8 @@ class Url extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['url', 'short'], 'required'],
-            [['created'], 'safe'],
+            [['url', 'short', 'created'], 'required'],
+            [['created'], 'numeric'],
             [['url'], 'string', 'max' => 2048],
             [['url'], 'url', 'defaultScheme' => 'http'],
             [['short'], 'string', 'max' => self::SHORT_LINK_LENGTH],
@@ -44,37 +48,47 @@ class Url extends \yii\db\ActiveRecord
     {
         return [
             'id' => 'ID',
-            'url' => 'Url',
-            'short' => 'Short',
-            'created' => 'Created',
+            'url' => 'Original Url',
+            'short' => 'Short URL',
+            'created' => 'Created Unix Datetime',
         ];
     }
 
+    /**
+     * Auto prepare model for validate and save
+     * @return bool
+     * @throws ServerErrorHttpException
+     */
     public function beforeValidate()
     {
-        $this->short = $this->generateShortString();
-        $this->created = date('YmdHis');
+        $this->generateShortUrl();
+        $this->created = time();
         return true;
     }
 
-    private function generateShortString()
+    /**
+     * Short URL field generation
+     * @throws Exception
+     * @throws ServerErrorHttpException
+     */
+    private function generateShortUrl()
     {
+        if (!is_null($this->short)) {
+            return;
+        }
+
         $try = 0;
-        $range = array_merge(
-            range('a', 'z'),
-            range('A', 'Z'),
-            range(0, 9),
-            ['_', '-']
-        );
         do {
-            $s = '';
-            for ($i = 0; $i < self::SHORT_LINK_LENGTH; $i++) {
-                $s .= $range[mt_rand(0, count($range) - 1)];
-            }
+            $s = (new Security)->generateRandomString(self::SHORT_LINK_LENGTH);
             if (++$try > self::TRY_GENERATE_LIMIT) {
-                throw new \yii\web\ServerErrorHttpException('Try again please');
+                throw new ServerErrorHttpException('Try again please');
             }
         } while (!is_null(Url::findOne(['short' => $s])));
-        return $s;
+        $this->short = $s;
+    }
+
+    public function getAbsoluteShortURL()
+    {
+
     }
 }

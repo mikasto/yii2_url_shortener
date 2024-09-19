@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use app\components\YiiUrlMaker;
 use app\models\Url;
 use Yii;
 use yii\web\Controller;
@@ -25,13 +26,9 @@ class UrlController extends Controller
             if ($model->load($this->request->post()) && $model->save()) {
                 return $this->redirect(['view', 'short' => $model->short]);
             }
-        } else {
-            $model->loadDefaultValues();
         }
 
-        return $this->render('create', [
-            'model' => $model,
-        ]);
+        return $this->render('create', ['model' => $model,]);
     }
 
     /**
@@ -42,38 +39,30 @@ class UrlController extends Controller
      */
     public function actionView($short)
     {
-        $url = $this->findModel($short);
-        if (is_null($url)) {
+        $model = Url::findOne(['short' => $short]);
+        if (is_null($model)) {
             throw new NotFoundHttpException('URL not found');
         }
         return $this->render('view', [
-            'url' => strip_tags($url->url),
-            'short' => Yii::$app->urlManager->createAbsoluteUrl(['url/redirect', 'short' => $url->short]),
+            'url' => $model->url,
+            'short' => (new YiiUrlMaker($model))->getAbsoluteUrl(),
         ]);
     }
 
     /**
-     * Finds the Url model based on its primary key value.
-     * If the model is not found, a 404 HTTP exception will be thrown.
-     * @param string $short
-     * @return Url the loaded model
-     * @throws NotFoundHttpException if the model cannot be found
+     * @param $short
+     * @return \yii\web\Response
      */
-    protected function findModel($short)
-    {
-        if (($model = Url::findOne(['short' => $short])) !== null) {
-            return $model;
-        }
-
-        throw new NotFoundHttpException('The requested page does not exist.');
-    }
-
     public function actionRedirect($short)
     {
-        $url = $this->findModel($short);
-        if (is_null($url)) {
-            throw new NotFoundHttpException('URL not found');
+        $model = Url::findOne(['short' => $short]);
+        if (is_null($model)) {
+            return $this->redirect(['view', 'short' => $short]);
         }
-        $this->redirect($url->url);
+
+        Yii::$app->response->headers->set('Cache-Control', ['private', 'no-cache']);
+
+        // http status code 302 Found - to catch all views without cache
+        return $this->redirect($model->url, 302);
     }
 }
