@@ -86,9 +86,4 @@ class Url extends \yii\db\ActiveRecord
         } while (!is_null(Url::findOne(['short' => $s])));
         $this->short = $s;
     }
-
-    public function getAbsoluteShortURL()
-    {
-
-    }
 }
