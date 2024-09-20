@@ -4,6 +4,7 @@ namespace app\models;
 
 use yii\base\Exception;
 use yii\base\Security;
+use yii\db\ActiveRecord;
 use yii\web\ServerErrorHttpException;
 
 /**
@@ -14,7 +15,7 @@ use yii\web\ServerErrorHttpException;
  * @property string $short
  * @property int $created
  */
-class Url extends \yii\db\ActiveRecord
+class Url extends ActiveRecord
 {
     const SHORT_LINK_LENGTH = 5;
     const TRY_GENERATE_LIMIT = 500;
@@ -34,10 +35,11 @@ class Url extends \yii\db\ActiveRecord
     {
         return [
             [['url', 'short', 'created'], 'required'],
-            [['created'], 'numeric'],
+            [['created'], 'integer'],
             [['url'], 'string', 'max' => 2048],
             [['url'], 'url', 'defaultScheme' => 'http'],
             [['short'], 'string', 'max' => self::SHORT_LINK_LENGTH],
+            [['short'], 'unique'],
         ];
     }
 
@@ -57,33 +59,35 @@ class Url extends \yii\db\ActiveRecord
     /**
      * Auto prepare model for validate and save
      * @return bool
-     * @throws ServerErrorHttpException
      */
-    public function beforeValidate()
+    public function prepare()
     {
-        $this->generateShortUrl();
         $this->created = time();
-        return true;
+        return $this->generateShortUrl();
     }
 
     /**
      * Short URL field generation
-     * @throws Exception
-     * @throws ServerErrorHttpException
+     * @return bool
      */
     private function generateShortUrl()
     {
         if (!is_null($this->short)) {
-            return;
+            return false;
         }
 
         $try = 0;
         do {
-            $s = (new Security)->generateRandomString(self::SHORT_LINK_LENGTH);
+            try {
+                $s = (new Security)->generateRandomString(self::SHORT_LINK_LENGTH);
+            } catch (\Throwable $e) {
+                return false;
+            }
             if (++$try > self::TRY_GENERATE_LIMIT) {
-                throw new ServerErrorHttpException('Try again please');
+                return false;
             }
         } while (!is_null(Url::findOne(['short' => $s])));
         $this->short = $s;
+        return true;
     }
 }
